@@ -116,7 +116,7 @@ You are required to implement the following tasks using Spark Streaming and Spar
 
 3. **Submit the Spark Job**: Use the `spark-submit` command to run your Spark job:
    ```bash
-   spark-submit streaming_job.py
+   spark-submit stock-price-analysis.py
    ```
 
 4. **CSV Output**: Ensure that each task writes its output to a separate CSV file in the `output/` directory.

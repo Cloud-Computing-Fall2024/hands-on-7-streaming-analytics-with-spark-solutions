@@ -44,10 +44,18 @@ def task2_currency_conversion(stock_stream):
     print(f"Task 2 output written to {task2_output}")
 
 # ------------------------
-# Task 3: Moving Average with Dynamic Time Windows
+# Task 3: Moving Average with Dynamic Time Windows (with watermark)
 # ------------------------
 def task3_moving_average(stock_stream):
-    moving_avg = stock_stream.groupBy(window(col("Timestamp"), "15 seconds", "5 seconds"), "StockSymbol").agg(avg("Price").alias("MovingAvg"))
+    # Add a watermark on the timestamp column
+    stock_stream_with_watermark = stock_stream.withWatermark("Timestamp", "1 minute")
+    
+    # Calculate moving average with a window of 15 seconds, sliding every 5 seconds
+    moving_avg = stock_stream_with_watermark.groupBy(
+        window(col("Timestamp"), "15 seconds", "5 seconds"), "StockSymbol"
+    ).agg(avg("Price").alias("MovingAvg"))
+    
+    # Write the moving average to CSV files
     moving_avg.writeStream.format("csv").option("path", task3_output).option("checkpointLocation", "checkpoint/task3").start()
     print(f"Task 3 output written to {task3_output}")
 
