@@ -1,143 +1,170 @@
-### **Hands-on #7: Streaming Analytics with Spark**
+# **Hands-on #7: Streaming Analytics with Spark**
 
-#### **Objective:**
-In this hands-on activity, you will learn the fundamentals of **Spark Streaming** by processing a stream of real-time data. The objective is to get hands-on experience in setting up a streaming source, applying basic transformations, and performing analysis on the live data stream. The data stream will simulate a stream of stock prices, and you will perform basic calculations like moving averages and detecting large price changes.
+## **Objective**
 
----
-
-### **Dataset:**
-The dataset consists of a simulated stream of stock prices, generated in real-time. Each record in the stream contains the following information:
-
-- **Timestamp**: The time at which the stock price was recorded.
-- **StockSymbol**: The symbol of the stock (e.g., AAPL, TSLA, MSFT).
-- **Price**: The stock price at that moment.
+In this hands-on activity, you will learn how to process real-time data streams using **Spark Streaming**. You will perform various transformations and analyses on stock price data streamed in real-time from a Python socket server.
 
 ---
 
-### **Setup and Execution Instructions:**
+## **Data Generation**
 
-#### **Step 1: Fork the Repository**
-1. Fork the GitHub repository containing the starter code Using the Github Classroom link posted on Canvas.
-2. Clone the forked repository to your GitHub account.
+The stock price data will be generated in real-time by a Python script, which simulates stock prices for multiple companies. The data will be streamed through a socket connection to Spark.
 
-#### **Step 2: Launch GitHub Codespaces**
-1. Open your forked repository in **GitHub Codespaces**.
-2. Ensure that the GitHub Codespace has **Java** and **Python** installed (both are installed by default in GitHub Codespaces).
+### **Steps to Set Up the Data Stream**
 
-#### **Step 3: Install PySpark**
-The activity requires **PySpark** to run Spark Streaming jobs. Install it using `pip`.
+1. **Run the Data Generation Script**: This script will simulate stock price data and stream it through a socket on `localhost:9999`.
+2. **Connect Spark Streaming**: Your Spark job will connect to `localhost:9999` to receive and process the data stream.
 
-In the GitHub Codespace terminal, run the following command:
-```bash
-pip install pyspark
+### **Data Generation Script**
+
+Use the following Python script to generate stock price data:
+
+```python
+import socket
+import time
+import random
+from datetime import datetime
+
+# List of stock symbols representing various companies
+stock_symbols = [
+    "AAPL", "GOOGL", "AMZN", "TSLA", "MSFT", "NFLX", 
+    "FB", "BABA", "NVDA", "INTC", "ORCL", "IBM", 
+    "TWTR", "DIS", "V", "PYPL", "CSCO", "QCOM", 
+    "ADBE", "SAP", "CRM", "UBER", "LYFT", "SHOP", 
+    "PINS", "SNAP", "SQ", "PLTR", "ZM", "NIO"
+]
+
+def generate_stock_price():
+    while True:
+        symbol = random.choice(stock_symbols)
+        price = round(random.uniform(80, 2000), 2)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = f"{timestamp},{symbol},{price}\n"
+        yield message
+        time.sleep(1)
+
+def start_socket_server(host="localhost", port=9999):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((host, port))
+        server_socket.listen(1)
+        print(f"Server started at {host}:{port}. Waiting for client connection...")
+
+        conn, addr = server_socket.accept()
+        print(f"Connected by {addr}")
+
+        with conn:
+            for stock_data in generate_stock_price():
+                conn.sendall(stock_data.encode())
+                print(f"Sent: {stock_data.strip()}")
+
+if __name__ == "__main__":
+    start_socket_server()
 ```
 
----
+### **How to Run the Data Generation Script**
 
-### **Tasks:**
+1. Run the Python script to start the socket server:
+   ```bash
+   python generate_stock_price.py
+   ```
+   The script will stream real-time stock price data to `localhost:9999`.
 
-#### **Task 1: Real-Time Data Ingestion**
-- **Objective**: Set up a **data stream** to ingest real-time stock price data.
-- **Instructions**:
-    1. Use a **socket** as the data source to simulate a stream of stock prices. 
-    2. Connect to a socket at `localhost:9999`.
-    3. Use the data format:
-        - Timestamp, StockSymbol, Price (e.g., `2023-10-30 10:15:30, AAPL, 150.5`)
-    4. Continuously ingest data from the stream using Spark’s `readStream` API.
-
-**Expected Outcome**: Spark will continuously read stock price data from the socket.
+2. **Connect Spark**: Your Spark job should connect to the socket using:
+   ```python
+   stock_stream = spark.readStream.format("socket").option("host", "localhost").option("port", 9999).load()
+   ```
 
 ---
 
-#### **Task 2: Basic Transformations**
-- **Objective**: Perform basic transformations on the streaming data.
-- **Instructions**:
-    1. Parse the incoming data to extract the timestamp, stock symbol, and price.
-    2. Convert the stock price to a floating-point number.
-    3. Filter out records with missing or incorrect data.
-    4. Group the stock prices by `StockSymbol`.
+## **Tasks**
 
-**Expected Outcome**: A DataFrame containing the parsed stock prices, grouped by stock symbol.
+You are required to implement the following tasks using Spark Streaming and Spark SQL:
 
----
+### **Task 1: Real-Time Data Ingestion with Filtering**
 
-#### **Task 3: Moving Average Calculation**
-- **Objective**: Calculate a **moving average** of the stock price for each stock symbol.
-- **Instructions**:
-    1. Calculate the moving average for each stock symbol over the last 10 seconds of data.
-    2. Use a **sliding window** of 10 seconds to compute the average stock price.
+- **Objective**: Ingest real-time stock price data and filter out any prices outside the range of $100 to $2000.
+- **Instructions**: Implement logic to filter the stock prices and write the filtered data to a CSV file.
 
-**Expected Outcome**: A DataFrame showing the stock symbol and its moving average price over the last 10 seconds.
+### **Task 2: Basic Transformations and Currency Conversion**
 
----
+- **Objective**: Convert stock prices from USD to EUR using a conversion rate of `1 USD = 0.85 EUR`.
+- **Instructions**: Add a new column with the converted prices and write the transformed data to a CSV file.
 
-#### **Task 4: Detect Large Price Changes**
-- **Objective**: Detect when a stock’s price changes by more than a certain threshold within a short time period.
-- **Instructions**:
-    1. Track the price of each stock symbol over time.
-    2. Detect when the price of a stock changes by more than 5% compared to the previous price.
-    3. Output an alert whenever a large price change is detected.
+### **Task 3: Moving Average with Dynamic Time Windows**
 
-**Expected Outcome**: A DataFrame showing stock symbols that experienced a large price change, along with the percentage change.
+- **Objective**: Calculate the moving average of the stock prices for each stock symbol over a window of 15 seconds, sliding by 5 seconds.
+- **Instructions**: Use window functions to calculate the moving average and write the result to a CSV file.
+
+### **Task 4: Detect Sudden Price Spikes or Drops**
+
+- **Objective**: Detect when the stock price changes by more than 10% compared to the previous price.
+- **Instructions**: Track the previous price using a window function, calculate the price change, and write the result to a CSV file when the change exceeds 10%.
 
 ---
 
-### **Step 4: Simulating the Data Stream**
+## **Execution Instructions**
 
-1. You will simulate a real-time data stream using **Netcat** or another utility to generate stock price data.
-2. To start a stream, run the following command in a separate terminal:
-```bash
-nc -lk 9999
-```
-3. In the Netcat terminal, manually enter stock price data in the following format:
-```
-2023-10-30 10:15:30, AAPL, 150.5
-2023-10-30 10:16:30, TSLA, 900.0
-```
+1. **Install PySpark**: If PySpark is not already installed, install it using `pip`:
+   ```bash
+   pip install pyspark
+   ```
 
-You can continuously enter or script the input to simulate a stream of stock prices.
+2. **Run the Data Generation Script**: Start the socket server to stream stock price data:
+   ```bash
+   python generate_stock_price.py
+   ```
 
----
+3. **Submit the Spark Job**: Use the `spark-submit` command to run your Spark job:
+   ```bash
+   spark-submit streaming_job.py
+   ```
 
-### **Step 5: Run the Streaming Job Using `spark-submit`**
-
-After implementing the tasks, execute the Spark Streaming job using `spark-submit`:
-
-```bash
-spark-submit <your_python_script.py>
-```
-Replace `<your_python_script.py>` with the name of your Python script.
+4. **CSV Output**: Ensure that each task writes its output to a separate CSV file in the `output/` directory.
 
 ---
 
-### **Step 6: Submit Your Work**
+## **GitHub Submission Instructions**
 
-Once you have completed the tasks:
-1. Commit and push your code to your GitHub repository.
-2. Ensure that all the task logic is implemented correctly in the Python script.
-3. Submit the repository link on GitHub Classroom.
+### **Step 1: Fork the GitHub Repository**
+1. **Click the GitHub Classroom link** provided in Canvas.
+2. Fork the repository to your own GitHub account.
+3. Clone the repository to your local machine or use **GitHub Codespaces** for development.
+
+### **Step 2: Complete the Activity**
+1. Write your Spark Streaming logic for each task in the appropriate function in the provided Python script.
+2. Ensure that each task writes its results to a separate CSV file in the `output/` directory.
+
+### **Step 3: Push Your Changes to GitHub**
+1. After completing the tasks, add the files to Git:
+   ```bash
+   git add .
+   ```
+2. Commit your changes with a meaningful message:
+   ```bash
+   git commit -m "Completed Spark Streaming Hands-on Activity"
+   ```
+3. Push the changes to your repository:
+   ```bash
+   git push origin main
+   ```
+
+### **Step 4: Submit the GitHub Repository**
+1. Submit the link to your **GitHub repository** in GitHub Classroom.
 
 ---
 
-### **Expected Output:**
+## **Deliverables**
 
-- **Task 1**: Continuous stream of stock price data ingested from the socket.
-- **Task 2**: Parsed and grouped stock price data.
-- **Task 3**: Moving average of stock prices for each stock symbol.
-- **Task 4**: Alerts for large stock price changes.
+1. **Source Code**: Submit the source code for each task in your Spark Streaming job.
+2. **CSV Outputs**: Submit the CSV files generated by each task, saved in the `output/` directory.
 
 ---
 
-### **Grading Criteria:**
+## **Grading Criteria**
 
-- **Correctness**: Ensure the data is ingested correctly from the stream and transformations are applied as per the task requirements.
-- **Execution**: Ensure the streaming job runs without errors and continuously processes incoming data.
-- **Output**: Verify that the output matches the expected results for each task.
-
----
-
-### **Support and Questions:**
-
-If you have any questions or run into issues, feel free to reach out during office hours or post your queries in the course discussion forum.
+- **Correctness**: Each task should correctly implement the required logic and output the correct results.
+- **Use of Spark SQL**: Demonstrate proper use of Spark SQL transformations and window functions.
+- **Output**: Each task should write the expected results to a separate CSV file.
+- **Submission**: Ensure all files (CSV outputs and code) are pushed to GitHub and the repository link is submitted via GitHub Classroom.
 
 ---
